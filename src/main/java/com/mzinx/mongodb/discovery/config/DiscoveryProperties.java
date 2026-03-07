@@ -17,7 +17,8 @@ public class DiscoveryProperties {
             return interval*max;
         }
     }
-    private Heartbeat heartbeat = new Heartbeat();
     private boolean enabled = true;
+    private String hostname = System.getenv().getOrDefault("HOSTNAME", "localhost");
+    private Heartbeat heartbeat = new Heartbeat();
     private String collection = "_instances";    
 }

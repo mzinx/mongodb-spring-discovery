@@ -51,6 +51,7 @@ public class DiscoveryAutoConfig {
 
     @Autowired
     private DiscoveryProperties discoveryProperties;
+
     @Autowired
     private MongoTemplate mongoTemplate;
 
@@ -59,8 +60,6 @@ public class DiscoveryAutoConfig {
 
     @Autowired
     private ChangeStreamService<Document> changeStreamService;
-    
-	private String podName = System.getenv("HOSTNAME");
 
     private void createIndex(MongoCollection<Document> coll) {
         coll.createIndex(Indexes.descending(INDEX_KEY),
@@ -108,8 +107,8 @@ public class DiscoveryAutoConfig {
 
     @Scheduled(fixedRateString = "#{@discoveryProperties.heartbeat.interval}")
     private void heartbeat() {
-        mongoTemplate.getCollection(discoveryProperties.getCollection()).updateOne(Filters.eq("_id", podName),
-                Updates.combine(Updates.set("_id", podName), Updates.set(INDEX_KEY, new Date())),
+        mongoTemplate.getCollection(discoveryProperties.getCollection()).updateOne(Filters.eq("_id", discoveryProperties.getHostname()),
+                Updates.combine(Updates.set("_id", discoveryProperties.getHostname()), Updates.set(INDEX_KEY, new Date())),
                 new UpdateOptions().upsert(true));
     }
 }
