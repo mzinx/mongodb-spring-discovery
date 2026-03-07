@@ -29,11 +29,9 @@ import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.changestream.FullDocumentBeforeChange;
-import com.mzinx.mongodb.changestream.model.ApplicationEvent;
 import com.mzinx.mongodb.changestream.model.ChangeStream;
 import com.mzinx.mongodb.changestream.model.ChangeStreamRegistry;
 import com.mzinx.mongodb.changestream.model.ChangeStream.Mode;
-import com.mzinx.mongodb.changestream.service.ApplicationEventService;
 import com.mzinx.mongodb.changestream.service.ChangeStreamService;
 
 import jakarta.annotation.PostConstruct;
@@ -61,9 +59,6 @@ public class DiscoveryAutoConfig {
 
     @Autowired
     private ChangeStreamService<Document> changeStreamService;
-
-    @Autowired
-    private ApplicationEventService<Document> applicationEventService;
     
 	private String podName = System.getenv("HOSTNAME");
 
@@ -89,21 +84,19 @@ public class DiscoveryAutoConfig {
         cs = ChangeStream.of("discovery", Mode.BOARDCAST,
                 List.of(Aggregates.match(Filters.in("operationType", List.of("insert", "update", "delete"))))).fullDocumentBeforeChange(FullDocumentBeforeChange.REQUIRED);
         changeStreamService.run(ChangeStreamRegistry.<Document>builder().collectionName(discoveryProperties.getCollection()).body(e -> {
-            ApplicationEvent<Document> event = ApplicationEvent.<Document>builder().name(e.getOperationType().name()).key(e.getDocumentKey().getString("_id").getValue()).updateDescription(e.getUpdateDescription()).build();
+            String instance = e.getDocumentKey().getString("_id").getValue();
             switch (e.getOperationType()) {
                 case INSERT:
-                    this.instances.add(event.getKey());
-                    event.setDocument(e.getFullDocument());
+                    this.instances.add(instance);
                     break;
                 case UPDATE:
                     break;
                 case DELETE:
-                    this.instances.remove(event.getKey());
-                    event.setDocument(e.getFullDocumentBeforeChange());
+                    this.instances.remove(instance);
                     break;
                 default:
             }
-            applicationEventService.publish(event);
+            changeStreamService.publish(e);
         }).changeStream(cs).build());
     }
 
