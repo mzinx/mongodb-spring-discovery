@@ -61,14 +61,6 @@ discovery.heartbeat.max=10
 
 The discovery service starts automatically with your Spring Boot application. No additional code is required for basic instance registration and discovery.
 
-```java
-@SpringBootApplication
-public class MyApplication {
-    public static void main(String[] args) {
-        SpringApplication.run(MyApplication.class, args);
-    }
-}
-```
 
 ### Accessing Instance Information
 
@@ -100,33 +92,6 @@ public void setupInstanceListener() {
 }
 ```
 
-### Custom Instance Metadata
-
-You can extend the basic discovery by storing additional metadata with each instance:
-
-```java
-@Autowired
-private MongoTemplate mongoTemplate;
-
-@Autowired
-private DiscoveryProperties discoveryProperties;
-
-public void registerWithMetadata() {
-    Document instanceDoc = new Document("_id", discoveryProperties.getHostname())
-        .append("at", new Date())
-        .append("version", "1.0.0")
-        .append("services", Arrays.asList("api", "worker"))
-        .append("region", "us-east-1");
-
-    mongoTemplate.getCollection(discoveryProperties.getCollection())
-        .replaceOne(
-            Filters.eq("_id", discoveryProperties.getHostname()),
-            instanceDoc,
-            new ReplaceOptions().upsert(true)
-        );
-}
-```
-
 ## How It Works
 
 ### Heartbeat Mechanism
@@ -154,21 +119,6 @@ This discovery module works seamlessly with the change stream module to provide:
 - **Auto-Recovery**: Failed instances can be detected and processing redistributed
 - **Auto-Scaling**: New instances can be discovered and included in load balancing
 - **Distributed Coordination**: Multiple instances can coordinate through shared state
-
-## Monitoring and Observability
-
-The service provides logging for:
-
-- Instance registrations and deregistrations
-- Heartbeat operations
-- Change stream events
-- TTL index management
-
-Enable debug logging to monitor discovery operations:
-
-```properties
-logging.level.com.mzinx.mongodb.discovery=DEBUG
-```
 
 ## Best Practices
 
