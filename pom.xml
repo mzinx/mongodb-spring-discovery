@@ -14,7 +14,7 @@
 	<version>0.0.3</version>
     <packaging>jar</packaging>
 
-	<name>mongodb-spring-discovery</name>
+	<name>MongoDB Spring Discovery</name>
 	<description>MongoDB Spring extension for instance discovery</description>
 	<url>https://github.com/mzinx/mongodb-spring-discovery</url>
 	
