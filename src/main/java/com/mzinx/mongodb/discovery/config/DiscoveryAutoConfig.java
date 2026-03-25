@@ -29,6 +29,7 @@ import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.changestream.FullDocumentBeforeChange;
+import com.mzinx.mongodb.changestream.config.ChangeStreamProperties;
 import com.mzinx.mongodb.changestream.model.ChangeStream;
 import com.mzinx.mongodb.changestream.model.ChangeStreamRegistry;
 import com.mzinx.mongodb.changestream.model.ChangeStream.Mode;
@@ -51,6 +52,8 @@ public class DiscoveryAutoConfig {
 
     @Autowired
     private DiscoveryProperties discoveryProperties;
+    @Autowired
+    private ChangeStreamProperties changeStreamProperties;
 
     @Autowired
     private MongoTemplate mongoTemplate;
@@ -63,7 +66,9 @@ public class DiscoveryAutoConfig {
 
     private void createIndex(MongoCollection<Document> coll) {
         coll.createIndex(Indexes.descending(INDEX_KEY),
-                new IndexOptions().expireAfter(discoveryProperties.getHeartbeat().getMaxTimeout(), TimeUnit.MILLISECONDS).name(INDEX_NAME));
+                new IndexOptions()
+                        .expireAfter(discoveryProperties.getHeartbeat().getMaxTimeout(), TimeUnit.MILLISECONDS)
+                        .name(INDEX_NAME));
     }
 
     ChangeStream<Document> cs;
@@ -79,10 +84,16 @@ public class DiscoveryAutoConfig {
                 createIndex(coll);
             }
         }
-        this.instances.addAll(coll.find().projection(Projections.include("_id")).map(d->d.getString("_id")).into(new ArrayList<>()));
+        this.instances.addAll(coll.find().projection(Projections.include("_id")).map(d -> d.getString("_id"))
+                .into(new ArrayList<>()));
         cs = ChangeStream.of("discovery", Mode.BOARDCAST,
-                List.of(Aggregates.match(Filters.in("operationType", List.of("insert", "update", "delete"))))).fullDocumentBeforeChange(FullDocumentBeforeChange.REQUIRED);
-        changeStreamService.run(ChangeStreamRegistry.<Document>builder().collectionName(discoveryProperties.getCollection()).body(e -> {
+                List.of(Aggregates.match(Filters.and(
+                        Filters.in("ns.coll",
+                                List.of(discoveryProperties.getCollection(),
+                                        changeStreamProperties.getChangeStreamCollection())),
+                        Filters.in("operationType", List.of("insert", "update", "delete"))))))
+                .fullDocumentBeforeChange(FullDocumentBeforeChange.REQUIRED);
+        changeStreamService.run(ChangeStreamRegistry.<Document>builder().body(e -> {
             String instance = e.getDocumentKey().getString("_id").getValue();
             switch (e.getOperationType()) {
                 case INSERT:
@@ -107,8 +118,10 @@ public class DiscoveryAutoConfig {
 
     @Scheduled(fixedRateString = "#{@discoveryProperties.heartbeat.interval}")
     private void heartbeat() {
-        mongoTemplate.getCollection(discoveryProperties.getCollection()).updateOne(Filters.eq("_id", discoveryProperties.getHostname()),
-                Updates.combine(Updates.set("_id", discoveryProperties.getHostname()), Updates.set(INDEX_KEY, new Date())),
+        mongoTemplate.getCollection(discoveryProperties.getCollection()).updateOne(
+                Filters.eq("_id", discoveryProperties.getHostname()),
+                Updates.combine(Updates.set("_id", discoveryProperties.getHostname()),
+                        Updates.set(INDEX_KEY, new Date())),
                 new UpdateOptions().upsert(true));
     }
 }
