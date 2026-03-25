@@ -29,7 +29,6 @@ import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.changestream.FullDocumentBeforeChange;
-import com.mzinx.mongodb.changestream.config.ChangeStreamProperties;
 import com.mzinx.mongodb.changestream.model.ChangeStream;
 import com.mzinx.mongodb.changestream.model.ChangeStreamRegistry;
 import com.mzinx.mongodb.changestream.model.ChangeStream.Mode;
@@ -52,8 +51,6 @@ public class DiscoveryAutoConfig {
 
     @Autowired
     private DiscoveryProperties discoveryProperties;
-    @Autowired
-    private ChangeStreamProperties changeStreamProperties;
 
     @Autowired
     private MongoTemplate mongoTemplate;
@@ -87,13 +84,10 @@ public class DiscoveryAutoConfig {
         this.instances.addAll(coll.find().projection(Projections.include("_id")).map(d -> d.getString("_id"))
                 .into(new ArrayList<>()));
         cs = ChangeStream.of("discovery", Mode.BOARDCAST,
-                List.of(Aggregates.match(Filters.and(
-                        Filters.in("ns.coll",
-                                List.of(discoveryProperties.getCollection(),
-                                        changeStreamProperties.getChangeStreamCollection())),
-                        Filters.in("operationType", List.of("insert", "update", "delete"))))))
+                List.of(Aggregates.match(
+                        Filters.in("operationType", List.of("insert", "update", "delete")))))
                 .fullDocumentBeforeChange(FullDocumentBeforeChange.REQUIRED);
-        changeStreamService.run(ChangeStreamRegistry.<Document>builder().body(e -> {
+        changeStreamService.run(ChangeStreamRegistry.<Document>builder().collectionName(discoveryProperties.getCollection()).body(e -> {
             String instance = e.getDocumentKey().getString("_id").getValue();
             switch (e.getOperationType()) {
                 case INSERT:
