@@ -85,9 +85,9 @@ public class DiscoveryAutoConfig {
                 .into(new ArrayList<>()));
         cs = ChangeStream.of("discovery", Mode.BOARDCAST,
                 List.of(Aggregates.match(
-                        Filters.in("operationType", List.of("insert", "delete")))))
+                        Filters.in("operationType", List.of("insert", "update", "delete")))))
                 .fullDocumentBeforeChange(FullDocumentBeforeChange.REQUIRED);
-        changeStreamService.run(ChangeStreamRegistry.<Document>builder().collectionName(discoveryProperties.getCollection()).body(e -> {
+        changeStreamService.start(ChangeStreamRegistry.<Document>builder().collectionName(discoveryProperties.getCollection()).body(e -> {
             String instance = e.getDocumentKey().getString("_id").getValue();
             switch (e.getOperationType()) {
                 case INSERT:
