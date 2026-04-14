@@ -63,7 +63,9 @@ public class DiscoveryAutoConfig {
 
     private void createIndex(MongoCollection<Document> coll) {
         coll.createIndex(Indexes.descending(INDEX_KEY),
-                new IndexOptions().expireAfter(discoveryProperties.getHeartbeat().getMaxTimeout(), TimeUnit.MILLISECONDS).name(INDEX_NAME));
+                new IndexOptions()
+                        .expireAfter(discoveryProperties.getHeartbeat().getMaxTimeout(), TimeUnit.MILLISECONDS)
+                        .name(INDEX_NAME));
     }
 
     ChangeStream<Document> cs;
@@ -79,16 +81,17 @@ public class DiscoveryAutoConfig {
                 createIndex(coll);
             }
         }
-        this.instances.addAll(coll.find().projection(Projections.include("_id")).map(d->d.getString("_id")).into(new ArrayList<>()));
+        this.instances.addAll(coll.find().projection(Projections.include("_id")).map(d -> d.getString("_id"))
+                .into(new ArrayList<>()));
         cs = ChangeStream.of("discovery", Mode.BOARDCAST,
-                List.of(Aggregates.match(Filters.in("operationType", List.of("insert", "update", "delete"))))).fullDocumentBeforeChange(FullDocumentBeforeChange.REQUIRED);
-        changeStreamService.run(ChangeStreamRegistry.<Document>builder().collectionName(discoveryProperties.getCollection()).body(e -> {
+                List.of(Aggregates.match(
+                        Filters.in("operationType", List.of("insert", "update", "delete")))))
+                .fullDocumentBeforeChange(FullDocumentBeforeChange.REQUIRED);
+        changeStreamService.start(ChangeStreamRegistry.<Document>builder().collectionName(discoveryProperties.getCollection()).body(e -> {
             String instance = e.getDocumentKey().getString("_id").getValue();
             switch (e.getOperationType()) {
                 case INSERT:
                     this.instances.add(instance);
-                    break;
-                case UPDATE:
                     break;
                 case DELETE:
                     this.instances.remove(instance);
@@ -107,8 +110,10 @@ public class DiscoveryAutoConfig {
 
     @Scheduled(fixedRateString = "#{@discoveryProperties.heartbeat.interval}")
     private void heartbeat() {
-        mongoTemplate.getCollection(discoveryProperties.getCollection()).updateOne(Filters.eq("_id", discoveryProperties.getHostname()),
-                Updates.combine(Updates.set("_id", discoveryProperties.getHostname()), Updates.set(INDEX_KEY, new Date())),
+        mongoTemplate.getCollection(discoveryProperties.getCollection()).updateOne(
+                Filters.eq("_id", discoveryProperties.getHostname()),
+                Updates.combine(Updates.set("_id", discoveryProperties.getHostname()),
+                        Updates.set(INDEX_KEY, new Date())),
                 new UpdateOptions().upsert(true));
     }
 }
