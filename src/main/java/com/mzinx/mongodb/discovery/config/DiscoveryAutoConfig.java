@@ -87,8 +87,8 @@ public class DiscoveryAutoConfig {
                 .id("discovery") // unique change stream id
                 .collectionName(discoveryProperties.getCollection()) // collection to watch (null = whole database)
                 .mode(Mode.BOARDCAST) // BOARDCAST, AUTO_RECOVER or AUTO_SCALE
-                .pipeline(List.of(Aggregates.match(
-                        Filters.in("operationType", List.of("insert", "update", "delete")))))
+                .pipeline(List.of(new Document("$match",
+                        new Document("operationType", new Document("$in", List.of("insert", "update", "delete"))))))
                 .listener("instanceWatch") // ChangeStreamListener bean name
                 .fullDocumentBeforeChange(FullDocumentBeforeChange.REQUIRED)
                 .enabled(true)
