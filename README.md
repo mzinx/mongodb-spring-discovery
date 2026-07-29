@@ -20,7 +20,7 @@ Add the following dependency to your `pom.xml`:
 <dependency>
     <groupId>com.mzinx</groupId>
     <artifactId>mongodb-spring-discovery</artifactId>
-    <version>0.0.3</version>
+    <version>1.0.0</version>
 </dependency>
 ```
 
@@ -30,7 +30,7 @@ Also add the change stream dependency for real-time notifications:
 <dependency>
     <groupId>com.mzinx</groupId>
     <artifactId>mongodb-spring-change-stream</artifactId>
-    <version>0.0.3</version>
+    <version>1.0.0</version>
 </dependency>
 ```
 
@@ -66,7 +66,7 @@ The discovery service starts automatically with your Spring Boot application. No
 
 ```java
 @Autowired
-private Set<String> instances; // Injected by DiscoveryAutoConfig
+private InstanceRegistry instanceRegistry; // populated by discovery heartbeats
 
 public void checkInstances() {
     System.out.println("Active instances: " + instances);

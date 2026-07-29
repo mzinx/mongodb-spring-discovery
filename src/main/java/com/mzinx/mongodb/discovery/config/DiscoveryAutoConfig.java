@@ -3,7 +3,6 @@ package com.mzinx.mongodb.discovery.config;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import org.bson.Document;
@@ -31,6 +30,7 @@ import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.changestream.FullDocumentBeforeChange;
+import com.mzinx.mongodb.changestream.InstanceRegistry;
 import com.mzinx.mongodb.changestream.model.ChangeStream.Mode;
 import com.mzinx.mongodb.changestream.model.ChangeStreamConfig;
 import com.mzinx.mongodb.changestream.service.ChangeStreamConfigService;
@@ -41,10 +41,10 @@ import jakarta.annotation.PostConstruct;
 @EnableConfigurationProperties(DiscoveryProperties.class)
 @ConditionalOnProperty(prefix = "discovery", name = "enabled", havingValue = "true", matchIfMissing = true)
 @ComponentScan("com.mzinx.mongodb.discovery")
-@Import(ScanRegistrar.class)
+@Import(AutoConfigurationPackageRegistrar.class)
 @EnableScheduling
 public class DiscoveryAutoConfig {
-    Logger logger = LoggerFactory.getLogger(this.getClass());
+    private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
     private static final String INDEX_KEY = "at";
     private static final String INDEX_NAME = "ttl";
@@ -53,12 +53,12 @@ public class DiscoveryAutoConfig {
 
     private final MongoTemplate mongoTemplate;
 
-    private final Set<String> instances;
+    private final InstanceRegistry instanceRegistry;
 
-    DiscoveryAutoConfig(DiscoveryProperties discoveryProperties, MongoTemplate mongoTemplate, Set<String> instances) {
+    DiscoveryAutoConfig(DiscoveryProperties discoveryProperties, MongoTemplate mongoTemplate, InstanceRegistry instanceRegistry) {
         this.discoveryProperties = discoveryProperties;
         this.mongoTemplate = mongoTemplate;
-        this.instances = instances;
+        this.instanceRegistry = instanceRegistry;
     }
 
     private void createIndex(MongoCollection<Document> coll) {
@@ -119,15 +119,15 @@ public class DiscoveryAutoConfig {
                 createIndex(coll);
             }
         }
-        this.instances.addAll(coll.find().projection(Projections.include("_id")).map(d -> d.getString("_id"))
+        this.instanceRegistry.addAll(coll.find().projection(Projections.include("_id")).map(d -> d.getString("_id"))
                 .into(new ArrayList<>()));
         changeStreamConfigService.save(ChangeStreamConfig.builder()
                 .id("discovery") // unique change stream id
                 .collectionName(discoveryProperties.getCollection()) // collection to watch (null = whole database)
-                .mode(Mode.BOARDCAST) // BOARDCAST, AUTO_RECOVER or AUTO_SCALE
+                .mode(Mode.BROADCAST) // BROADCAST, AUTO_RECOVER or AUTO_SCALE
                 .pipeline(List.of(new Document("$match",
                         new Document("operationType", new Document("$in", List.of("insert", "update", "delete"))))))
-                .listener("instanceWatch") // ChangeStreamListener bean name
+                .listener("instanceChangeListener") // ChangeStreamListener bean name
                 .fullDocumentBeforeChange(FullDocumentBeforeChange.REQUIRED)
                 .enabled(true)
                 .build());
