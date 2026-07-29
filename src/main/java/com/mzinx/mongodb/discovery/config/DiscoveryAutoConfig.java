@@ -21,7 +21,9 @@ import org.springframework.scheduling.annotation.Scheduled;
 
 import com.mongodb.MongoCommandException;
 import com.mongodb.client.MongoCollection;
-import com.mongodb.client.model.Aggregates;
+import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.model.ChangeStreamPreAndPostImagesOptions;
+import com.mongodb.client.model.CreateCollectionOptions;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.IndexOptions;
 import com.mongodb.client.model.Indexes;
@@ -30,7 +32,6 @@ import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.changestream.FullDocumentBeforeChange;
 import com.mzinx.mongodb.changestream.model.ChangeStream.Mode;
-import com.mzinx.mongodb.changestream.model.ChangeStream.ResumeStrategy;
 import com.mzinx.mongodb.changestream.model.ChangeStreamConfig;
 import com.mzinx.mongodb.changestream.service.ChangeStreamConfigService;
 
@@ -70,8 +71,45 @@ public class DiscoveryAutoConfig {
     @Autowired
     private ChangeStreamConfigService changeStreamConfigService;
 
+    /**
+     * Ensures the instance collection exists with change stream pre- and
+     * post-images enabled. The discovery change stream is registered with
+     * {@link FullDocumentBeforeChange#REQUIRED}, so without pre-images the
+     * change stream cursor fails as soon as a heartbeat document is updated
+     * or expires (e.g. on a fresh database where the collection would
+     * otherwise be created implicitly by the first heartbeat upsert).
+     */
+    private void enablePreImages() {
+        String collectionName = discoveryProperties.getCollection();
+        MongoDatabase db = mongoTemplate.getDb();
+        boolean exists = db.listCollectionNames().into(new ArrayList<>()).contains(collectionName);
+        if (!exists) {
+            try {
+                db.createCollection(collectionName, new CreateCollectionOptions()
+                        .changeStreamPreAndPostImagesOptions(new ChangeStreamPreAndPostImagesOptions(true)));
+                logger.info("Created collection '{}' with changeStreamPreAndPostImages enabled", collectionName);
+                return;
+            } catch (MongoCommandException e) {
+                // 48 = NamespaceExists: created concurrently by another instance,
+                // fall through to collMod below.
+                if (e.getErrorCode() != 48)
+                    throw e;
+            }
+        }
+        try {
+            db.runCommand(new Document("collMod", collectionName)
+                    .append("changeStreamPreAndPostImages", new Document("enabled", true)));
+            logger.info("Enabled changeStreamPreAndPostImages on collection '{}'", collectionName);
+        } catch (MongoCommandException e) {
+            logger.error("Unable to enable changeStreamPreAndPostImages on collection '{}' (requires the collMod "
+                    + "privilege, e.g. the dbAdmin role); the discovery change stream requires pre-images and "
+                    + "will fail on update/delete events", collectionName, e);
+        }
+    }
+
     @PostConstruct
     private void init() {
+        enablePreImages();
         MongoCollection<Document> coll = mongoTemplate.getCollection(discoveryProperties.getCollection());
         try {
             createIndex(coll);
