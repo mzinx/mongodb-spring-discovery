@@ -29,7 +29,8 @@ public class InstanceChangeListener implements ChangeStreamListener<Document> {
     }
 
     @Override
-    public void onEvent(ChangeStreamDocument<Document> event) {
+    public void onEvent(String streamId, java.util.Map<String, Object> attributes,
+            ChangeStreamDocument<Document> event) {
         String instance = event.getDocumentKey().getString("_id").getValue();
         switch (event.getOperationType()) {
             case INSERT:
