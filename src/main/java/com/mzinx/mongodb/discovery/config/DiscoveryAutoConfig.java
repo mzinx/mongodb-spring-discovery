@@ -129,6 +129,9 @@ public class DiscoveryAutoConfig {
                         new Document("operationType", new Document("$in", List.of("insert", "update", "delete"))))))
                 .listener("instanceChangeListener") // ChangeStreamListener bean name
                 .fullDocumentBeforeChange(FullDocumentBeforeChange.REQUIRED)
+                // Internal infra: every app with the discovery library runs its
+                // own instance watch, regardless of business/manager role.
+                .runOn(ChangeStreamConfig.RunOn.ANY)
                 .enabled(true)
                 .build());
 
